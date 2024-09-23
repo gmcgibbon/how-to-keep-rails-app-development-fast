@@ -1,0 +1,741 @@
+ <!DOCTYPE html>
+<html>
+  <head>
+    <title>How to keep Rails app development fast</title>
+    <meta charset="utf-8">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="https://unpkg.com/reveal.js@5.1.0/dist/reset.css">
+    <link rel="stylesheet" href="https://unpkg.com/reveal.js@5.1.0/dist/reveal.css">
+    <link rel="stylesheet" href="https://unpkg.com/reveal.js@5.1.0/dist/theme/blood.css">
+    <link rel="stylesheet" href="https://unpkg.com/highlight.js@11.10.0/styles/github-dark.css">
+    <link rel="stylesheet" href="https://unpkg.com/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "mermaid": "https://unpkg.com/mermaid@11.2.1/dist/mermaid.esm.min.mjs",
+          "reveal.js": "https://unpkg.com/reveal.js@5.1.0/dist/reveal.esm.js",
+          "reveal.js-mermaid-plugin": "./mermaid-plugin.js",
+          "reveal.js-laser-pointer-plugin": "./laser-pointer-plugin.js",
+          "reveal.js-markdown-plugin": "https://unpkg.com/reveal.js@5.1.0/plugin/markdown/markdown.esm.js",
+          "reveal.js-highlight-plugin": "https://unpkg.com/reveal.js@5.1.0/plugin/highlight/highlight.esm.js",
+          "reveal.js-notes-plugin": "https://unpkg.com/reveal.js@5.1.0/plugin/notes/notes.esm.js"
+        }
+      }
+    </script>
+  </head>
+  <style>
+    svg {
+      max-width: none !important;
+      line-height: 150%;
+      -webkit-text-stroke-width: 0.01px;
+    }
+
+    img[alt="Gannon"] {
+      width: 40%;
+      float: right;
+      padding-left: 10px;
+    }
+
+    img[alt="Boot Graph"] {
+      width: 85%;
+    }
+
+    img[alt="Rails Boot Process Talk"] {
+      width: 50%;
+    }
+
+    img[alt="Speedscope"] {
+      width: 70%;
+    }
+
+    img[alt="QR Code"] {
+      width: 40%;
+    }
+
+    video {
+      width: 65%;
+    }
+
+    #should-we-fix-this, #how-do-we-fix-this {
+      padding-bottom: 100px;
+    }
+  </style>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section data-markdown>
+          <textarea data-template>
+            ## How to keep Rails app development fast
+
+            #### [Gannon McGibbon](https://gannon.io/)
+
+            Note:
+            For Rails World 2024
+            ---
+            ## 👋 Hi, I'm Gannon
+
+            ![Gannon](images/me.jpg)
+
+            - Works at Shopify
+            - Committer on Ruby on Rails
+            - Organizes Winnipeg.rb
+            Note:
+            - Intro
+            ---
+            ## Let's talk about development
+
+            # 👨‍💻
+
+            Note:
+            - I'd like to talk about Rails app development
+            ---
+            ## When we first start our app
+
+            <video id="rails-new" src="images/rails-new.mp4"></video>
+
+            Note:
+            - When we first start a Rails app
+            - Very small, fast
+            - Life is good
+            ---
+            ## Developers build features
+
+            <video id="rails-scaffold" src="images/rails-scaffold.mp4"></video>
+
+            Note:
+            - Over time, our codebase grows
+            - Deadlines are set
+            - Code gets written
+            ---
+            ## Over time, things slow down
+
+            <video id="rails-boot-1" src="images/rails-boot.mp4"></video>
+
+            Note:
+            - One day you pull latest
+            - You notice the app is really slow
+            - You don't know why this is happening
+            - You don't know for how long either
+            ---
+            ## Does this sound familiar?
+
+            # 🤔
+
+            Note:
+            - Sounds familiar, right?
+            - This happens to everyone
+            - More developers, more problems
+            ---
+            ## Should we fix this?
+
+            # 💸💸💸
+
+            Note:
+            - Do we need to fix this?
+            - We could also just buy better hardware
+            - New laptops and better servers cost money
+            - If you have that money, it could bail you out
+            ---
+            ## Should we fix this?
+
+            ```sh
+            > bundle add spring --group development
+            ```
+            ```sh
+            > bundle exec spring binstub --all
+            * bin/rake: Spring inserted
+            * bin/rails: Spring inserted
+            ```
+
+            Note:
+            - The spring gem can be used
+            - This can help, but doesn't solve things
+            - You're still booting, just less often
+            ---
+            ## Should we fix this?
+
+            # ⏱️
+
+            Note:
+            - Developer time is still being wasted
+            - The price needs to be paid regularly
+            - More developers, more time lost
+            ---
+            ## How do we fix this?
+
+            # 🤔
+
+            Note:
+            - The question becomes, how do I fix this?
+            - Most developers would say use a profiler
+            - They're right
+            ---
+            ## Profiling
+
+            ```sh
+            > bundle add stackprof --group development
+            ```
+            ```rb
+            # config/boot.rb
+
+            if (mode = ENV["STACKPROF_MODE"])
+              interval = ENV.fetch("STACKPROF_INTERVAL", 1000)
+              require "stackprof"
+              StackProf.start(mode: mode.to_sym, raw: true, interval: interval.to_i)
+
+              at_exit do
+                StackProf.stop
+                data = StackProf.results
+                File.write("tmp/stackprof-boot.json", JSON.generate(data))
+              end
+            end
+            ```
+            ```sh
+            > STACKPROF_MODE=wall bin/rails runner ""
+            ```
+
+            Note:
+            - We instrumnent our app with a profiler
+            - In this case stackprof
+            - Run the app with STACKPROF_MODE=wall
+            - This will give us a file
+            ---
+            ## Profiling
+
+            ![Speedscope](images/speedscope.png)
+
+            Note:
+            - Feed this into a visualizer
+            - In this case speedscope
+            - We get a graph of what the app's doing
+            ---
+            ## Profiling
+
+            ```rb
+            # config/initializers/tax_rates.rb
+
+            Rails.configuration.to_prepare do
+              TaxService.load_rates
+            end
+            ```
+
+            Note:
+            - Someone added an initializer
+            - That initializer does a GET request
+            - That GET can take a long time
+            ---
+            ## Profiling
+
+            ```rb
+            # app/models/tax_service.rb
+
+            class TaxService
+              class << self
+                def load_rates
+                  Rails.cache.fetch("tax_rates", expires_in: 1.day) do
+                    api_client.get_rates
+                  end
+                end
+              end
+            end
+            ```
+
+            Note:
+            - We can fix this with caching
+            - Caching helps us do expensive work less often
+            - But we could go further
+            ---
+            ## Profiling
+
+            ```rb
+            # lib/tasks/tax.rake
+
+            namespace :tax do
+              task load_rates: :environment do
+                TaxService.load_rates
+              end
+            end
+            ```
+            ```sh
+            > bin/rails tax:load_rates
+            ```
+
+            Note:
+            - We could extract the code into a task
+            - It doesn't have to happen at boot at all
+            - Let's say we do that
+            ---
+            ## Profiling
+
+            # 😊
+
+            Note:
+            - Regression fixed
+            - It works, great!
+            - Problem solved
+            ---
+            ## Fast-forward a month
+
+            <video id="rails-boot-2" src="images/rails-boot.mp4"></video>
+
+            Note:
+            - Fast-forward a month
+            - We pull the latest
+            - We notice yet another regression
+            ---
+            ## How do we prevent this?
+
+            # 🤔
+
+            Note:
+            - We could keep fixing these issues
+            - We should investigate
+            - Maybe we should also ask how we can prevent this?
+            ---
+            ## I've been working on this problem
+
+            ![Commit Graph](images/commit-graph.png)
+
+            Note:
+            - Myself and a few others from Shopify have been working on this
+            - We've fixed lots of regressions on our monolith
+            - Through this, we've built up a simple mindset
+            ---
+            ## Why are we booting the app?
+
+            ```txt
+            => Booting Puma
+            => Rails 7.2.1 application starting in development
+            => Run `bin/rails server --help` for more startup options
+            Puma starting in single mode...
+            * Puma version: 6.4.2 (ruby 3.3.4-p94) ("The Eagle of Durango")
+            *  Min threads: 3
+            *  Max threads: 3
+            *  Environment: development
+            *          PID: 59468
+            * Listening on http://127.0.0.1:3000
+            * Listening on http://[::1]:3000
+            * Listening on http://127.255.255.0:3000
+            * Listening on http://127.0.2.2:3000
+            * Listening on http://127.0.2.3:3000
+            Use Ctrl-C to stop
+            ```
+
+            Note:
+            - That mindset is to ask yourself why
+            - Always ask yourself why the app is being booted
+            - Under what context is a peice of code important?
+            ---
+            ## Autoloading and eager loading
+
+            ![Autoloading Guide](images/autoloading-guide.png)
+
+            Note:
+            - In development, we use autoloading to do as little as possible
+            - In production, we eagerly load everything to make requests quick
+            - But there's more to think about
+            ---
+            ## What we do when we develop apps
+
+            - Write code
+            - Run tests
+            - Run the server
+            - Run tasks
+
+            Note:
+            - When building a Rails app, we do several things
+            - For each of these, we boot the server
+            - For each of these, we often load code we don't need to
+            - I'll review examples
+            ---
+            ## Writing code
+
+            ```sh
+            > bin/rails g resource user
+            ```
+            ```sh
+            > code my_app
+            ```
+
+            Note:
+            - When writing code, we use generators which boot the server
+            - These days, we also use language servers (LSP)
+            - This can boot Rails too
+            ---
+            ## Writing code
+
+            ```rb
+            # config/initializers/tax_rates.rb
+
+            Rails.configuration.to_prepare do
+              TaxService.load_rates
+            end
+            ```
+
+            Note:
+            - For example
+            - Do we need those tax rates to write code?
+            - Really any business logic at all?
+            ---
+            ## Writing code
+
+            ## ❌
+
+            Note:
+            - Probably not, no.
+            ---
+            ## Running tests
+
+            ```sh
+            > bin/rails test test/models/user_test.rb
+            ```
+            ```rb
+            # test/models/user_test.rb
+
+            require "test_helper"
+
+            class UserTest < ActiveSupport::TestCase
+              test "the truth" do
+                assert true
+              end
+            end
+            ```
+
+            Note:
+            - Running tests boots the server
+            - Specifically in the test helper
+            - We need to to access constants
+            ---
+            ## Running tests
+
+            ```rb
+            # app/models/app_schema.rb
+
+            class AppSchema < GraphQL::Schema
+              query QuryRoot
+              mutation MutationRoot
+            end
+            ```
+
+            Note:
+
+            - Do we need a GraphQL schema to run tests?
+            ---
+            ## Running tests
+
+            ## ❓
+
+            Note:
+            - We might
+            - There is yet more nuance to this answer
+            - We do need it for GraphQL tests
+            ---
+            ## Running the server
+
+            ```sh
+            > bin/rails server
+            ```
+            ```txt
+            Started GET "/users" for ::1 at 2024-09-21 21:19:13 -0500
+            Processing by UsersController#index as HTML
+              Rendering layout layouts/application.html.erb
+              Rendering users/index.html.erb within layouts/application
+              Rendered users/index.html.erb within layouts/application
+              Rendered layout layouts/application.html.erb
+            Completed 200 OK in 44ms
+            ```
+
+            Note:
+            - The server boots the app
+            - Then it boots the app server
+            ---
+            ## Running the server
+
+            ```rb
+            # app/models/user.rb
+
+            class User < ApplicationRecord
+              validates :first_name, presence: true
+              validates :email, presence: true
+            end
+            ```
+
+            Note:
+            - Do we need the User model to boot the server?
+            ---
+            ## Running the server
+
+            ## ❓
+
+            Note:
+            - We probably do
+            - There is yet more nuance to this answer
+            - We'll likely use it, just not upfront
+            ---
+            ## Running tasks
+
+            ```sh
+            > bin/rails db:migrate
+            ```
+            ```txt
+            == 20240921065947 CreateUsers: migrating ================
+            -- create_table(:users)
+              -> 0.0011s
+            == 20240921065947 CreateUsers: migrated (0.0011s) =======
+            ```
+
+            Note:
+            - Tasks like database migrations boot the server
+            - Precompiling assets and running the dbconsole do too
+            ---
+            ## Running tasks
+
+            ```rb
+            # config/routes.rb
+
+            Rails.application.routes.draw do
+              root to: "home#index"
+            end
+            ```
+
+            Note:
+            - Do we need routes to run migrations?
+            ---
+            ## Running tasks
+
+            ## ❌
+
+            Note:
+            - We do not.
+            ---
+            ## Wait, no routes?
+
+            ![Lazy Routes](images/lazy-routes.png)
+
+            Note:
+            - Today, Routes are always drawn at boot
+            - Part of my team's work was to fix this in edge Rails
+            - In an upcoming release, routes will be drawn lazily in dev and test
+            ---
+            ## Watching less files
+
+            ![I18n Watcher Optimization](images/i18n-watcher.png)
+
+            Note:
+            - We also made optimizations to file watching
+            ---
+            ## Restricting boot-time network IO
+
+            ```rb
+            # lib/patches/net_http.rb
+
+            class RestrictedTCPSocket < TCPSocket
+              class << self
+                attr_accessor :ready
+
+                def open(remote_host, remote_port, ...)
+                  raise "Not ready yet" unless ready
+                  super
+                end
+              end
+
+              self.ready = false
+            end
+            Net::HTTP::TCPSocket = RestrictedTCPSocket
+            ```
+
+            Note:
+            - And banned network requests on boot
+            ---
+            ## The "leak" pipeline
+
+            ```rb
+            # frozen_string_literal: true
+
+            require "bundler/setup"
+            require "active_support/lazy_load_hooks"
+
+            ActiveSupport.on_load(:active_record) { raise LoadError }
+            ActiveSupport.on_load(:active_model) { raise LoadError }
+
+            require_relative "../config/environment"
+
+            raise LoadError if defined?(Google::Cloud::Storage)
+            raise LoadError if defined?(Pry)
+            ```
+
+            Note:
+            - What I really want to talk about is
+            - The script we wrote to catch speed regressions
+            - This is a crude version that fits on one slide
+            - We call it the leak pipeline
+            ---
+            ## The "leak" pipeline
+
+            ```rb[3-4]
+            # frozen_string_literal: true
+
+            require "bundler/setup"
+            require "active_support/lazy_load_hooks"
+
+            ActiveSupport.on_load(:active_record) { raise LoadError }
+            ActiveSupport.on_load(:active_model) { raise LoadError }
+
+            require_relative "../config/environment"
+
+            raise LoadError if defined?(Google::Cloud::Storage)
+            raise LoadError if defined?(Pry)
+            ```
+
+            Note:
+            - First we setup bundler and require load hooks
+            - If you're not familiar, load hooks are callbacks for autoloaded Rails classes
+            - Classes have callbacks because they're slow to load
+            ---
+            ## The "leak" pipeline
+
+            ```rb[6-7]
+            # frozen_string_literal: true
+
+            require "bundler/setup"
+            require "active_support/lazy_load_hooks"
+
+            ActiveSupport.on_load(:active_record) { raise LoadError }
+            ActiveSupport.on_load(:active_model) { raise LoadError }
+
+            require_relative "../config/environment"
+
+            raise LoadError if defined?(Google::Cloud::Storage)
+            raise LoadError if defined?(Pry)
+            ```
+
+            Note:
+            - We setup load hooks for Active Record and Active Model
+            - We define these before booting to make sure they run first
+            - There are many more to hooks in Rails
+            ---
+            ## The "leak" pipeline
+
+            ```rb[9]
+            # frozen_string_literal: true
+
+            require "bundler/setup"
+            require "active_support/lazy_load_hooks"
+
+            ActiveSupport.on_load(:active_record) { raise LoadError }
+            ActiveSupport.on_load(:active_model) { raise LoadError }
+
+            require_relative "../config/environment"
+
+            raise LoadError if defined?(Google::Cloud::Storage)
+            raise LoadError if defined?(Pry)
+            ```
+
+            Note:
+            - We boot the application with this require
+            ---
+            ## The "leak" pipeline
+
+            ```rb[11-12]
+            # frozen_string_literal: true
+
+            require "bundler/setup"
+            require "active_support/lazy_load_hooks"
+
+            ActiveSupport.on_load(:active_record) { raise LoadError }
+            ActiveSupport.on_load(:active_model) { raise LoadError }
+
+            require_relative "../config/environment"
+
+            raise LoadError if defined?(Google::Cloud::Storage)
+            raise LoadError if defined?(Pry)
+            ```
+
+            Note:
+            - We can then use Ruby's defined? method to check for constants
+            - We're defining checks for heavier gems like GCS and Pry
+            ---
+            ## The "leak" pipeline
+
+            ```rb
+            # frozen_string_literal: true
+
+            require "bundler/setup"
+            require "active_support/lazy_load_hooks"
+
+            ActiveSupport.on_load(:active_record) { raise LoadError }
+            ActiveSupport.on_load(:active_model) { raise LoadError }
+
+            require_relative "../config/environment"
+
+            raise LoadError if defined?(Google::Cloud::Storage)
+            raise LoadError if defined?(Pry)
+            ```
+
+            Note:
+            - Plug this script into CI and see what it finds
+            ---
+            ## Our progress
+
+            ![Boot Graph](images/boot-graph.png)
+
+            Note:
+            - With that script and hours of profiling
+            - We were able to cut down the boot time of our app from 12.5 seconds to 4 seconds
+            - Better yet, we've only seen 1 major regression
+            ---
+            ## Want to learn more?
+
+            ![Rails Boot Process Talk](images/rails-boot-process-talk.png)
+
+            Note:
+            - Xavier is giving a talk tomorrow on boot
+            - He'll go into more depth
+            - Please check it out
+            ---
+            ## Thanks!
+
+            ![QR Code](images/qr-code.png)
+
+            Note:
+            - Thanks for listening
+            - Scan this QR code to view this presentation
+            ---
+          </textarea>
+        </section>
+      </div>
+    </div>
+    <script type="module">
+      import Reveal from 'reveal.js'
+      import Markdown from 'reveal.js-markdown-plugin'
+      import Mermaid from 'reveal.js-mermaid-plugin'
+      import LaserPointer from 'reveal.js-laser-pointer-plugin'
+      import Highlight from 'reveal.js-highlight-plugin'
+      import Notes from 'reveal.js-notes-plugin'
+
+      const deck = new Reveal({
+        plugins: [
+          Markdown,
+          Mermaid,
+          Highlight,
+          LaserPointer,
+          Notes,
+        ]
+      })
+      deck.initialize({
+        autoPlayMedia: true,
+        transition: 'none',
+        center: false,
+        controls: false,
+        hash: true,
+        controlsBackArrows: 'hidden',
+        mermaid: {
+          theme: 'dark',
+          themeVariables: {
+            signalTextColor: '',
+          },
+        },
+      })
+    </script>
+  </body>
+</html>
