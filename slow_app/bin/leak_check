@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "bundler/setup"
+require "active_support/lazy_load_hooks"
+
+ActiveSupport.on_load(:active_record) do
+  raise LoadError, "Active Record loaded early!"
+end
+ActiveSupport.on_load(:action_controller) do
+  raise LoadError, "Action Controller loaded early!"
+end
+
+require_relative "../config/environment"
+
+raise LoadError, "Pry loaded early!" if defined?(Pry)
+raise LoadError, "GCS loaded early!" if defined?(Google::Cloud::Storage)

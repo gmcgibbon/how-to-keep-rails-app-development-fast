@@ -36,6 +36,10 @@
       padding-left: 10px;
     }
 
+    img[alt="Rails World"] {
+      width: 65%;
+    }
+
     img[alt="Boot Graph"] {
       width: 85%;
     }
@@ -46,6 +50,10 @@
 
     img[alt="Speedscope"] {
       width: 70%;
+    }
+
+    img[alt="Talk QR Code"] {
+      width: 40%;
     }
 
     img[alt="QR Code"] {
@@ -70,7 +78,7 @@
             #### [Gannon McGibbon](https://gannon.io/)
 
             Note:
-            For Rails World 2024
+            For WRUG October 2024
             ---
             ## 👋 Hi, I'm Gannon
 
@@ -82,11 +90,22 @@
             Note:
             - Intro
             ---
+            ## Rails World!
+
+            ![Rails World](images/rails-world.jpg)
+
+            Note:
+            - I recently gave a shorter version of this talk at Rails World
+            - It wasn't recorded
+            - I received a lot of positive feedback on it
+            - So I decided to expand it a bit
+            ---
             ## Let's talk about development
 
             # 👨‍💻
 
             Note:
+            - With that said
             - I'd like to talk about Rails app development
             ---
             ## When we first start our app
@@ -191,23 +210,141 @@
             end
             ```
             ```sh
-            > STACKPROF_MODE=wall bin/rails runner ""
+            > STACKPROF_MODE=wall bin/rails boot
             ```
 
             Note:
-            - We instrumnent our app with a profiler
+            - We instrument our app with a profiler
             - In this case stackprof
-            - Run the app with STACKPROF_MODE=wall
-            - This will give us a file
+            - We can add that to our project with bundle add
+            - Then we add some code to config/boot
+            - Then we boot the app with a special environment variable
+            ---
+            ## Profiling
+
+            ```sh
+            > bundle add stackprof --group development
+            ```
+            ```rb[3]
+            # config/boot.rb
+
+            if (mode = ENV["STACKPROF_MODE"])
+              interval = ENV.fetch("STACKPROF_INTERVAL", 1000)
+              require "stackprof"
+              StackProf.start(mode: mode.to_sym, raw: true, interval: interval.to_i)
+
+              at_exit do
+                StackProf.stop
+                data = StackProf.results
+                File.write("tmp/stackprof-boot.json", JSON.generate(data))
+              end
+            end
+            ```
+            ```sh
+            > STACKPROF_MODE=wall bin/rails boot
+            ```
+
+            Note:
+            - In terms of the code
+            - First, we first check for STACKPROF_MODE
+            - We only want to profile boot when we tell it to
+            ---
+            ## Profiling
+
+            ```sh
+            > bundle add stackprof --group development
+            ```
+            ```rb[4-6]
+            # config/boot.rb
+
+            if (mode = ENV["STACKPROF_MODE"])
+              interval = ENV.fetch("STACKPROF_INTERVAL", 1000)
+              require "stackprof"
+              StackProf.start(mode: mode.to_sym, raw: true, interval: interval.to_i)
+
+              at_exit do
+                StackProf.stop
+                data = StackProf.results
+                File.write("tmp/stackprof-boot.json", JSON.generate(data))
+              end
+            end
+            ```
+            ```sh
+            > STACKPROF_MODE=wall bin/rails boot
+            ```
+
+            Note:
+            - Then we setup and start stackprof
+            - At this point, stackprof is monitoring our app
+            - It takes snapshots of our call stack every 1000 microseconds
+            ---
+            ## Profiling
+
+            ```sh
+            > bundle add stackprof --group development
+            ```
+            ```rb[8-12]
+            # config/boot.rb
+
+            if (mode = ENV["STACKPROF_MODE"])
+              interval = ENV.fetch("STACKPROF_INTERVAL", 1000)
+              require "stackprof"
+              StackProf.start(mode: mode.to_sym, raw: true, interval: interval.to_i)
+
+              at_exit do
+                StackProf.stop
+                data = StackProf.results
+                File.write("tmp/stackprof-boot.json", JSON.generate(data))
+              end
+            end
+            ```
+            ```sh
+            > STACKPROF_MODE=wall bin/rails boot
+            ```
+
+            Note:
+            - Finally, we set an at_exit hook
+            - This runs code when ruby exits
+            - That hook stops stackprof and writes profile data to a file
+            ---
+            ## Profiling
+
+            ```sh
+            > npm install -g speedscope
+            ```
+            ```sh
+            > speedscope tmp/stackprof-boot.json
+            ```
+            Note:
+            - To view the file we need a visualizer
+            - There are many to choose from
+            - I like speedscope
+            - Explain commands
             ---
             ## Profiling
 
             ![Speedscope](images/speedscope.png)
 
             Note:
-            - Feed this into a visualizer
-            - In this case speedscope
-            - We get a graph of what the app's doing
+            - This will give us a graph
+            - That graph will look something like this
+            - This is a picture of what the app did when booting
+            ---
+            ## Profiling
+
+            ![Speedscope](images/speedscope.png)
+
+            Note:
+            - Usually, profilers are used for requests
+            - Can be used on a program at any point
+            - And see what's slow
+            ---
+            ## Profiling
+
+            ![Speedscope](images/speedscope.png)
+
+            Note:
+            - Explain stack frames
             ---
             ## Profiling
 
@@ -324,7 +461,7 @@
             Note:
             - That mindset is to ask yourself why
             - Always ask yourself why the app is being booted
-            - Under what context is a peice of code important?
+            - Under what context is a piece of code important?
             ---
             ## Autoloading and eager loading
 
@@ -386,7 +523,7 @@
             ---
             ## Running tests
 
-            ```sh
+            ```txt
             > bin/rails test test/models/user_test.rb
             ```
             ```rb
@@ -423,7 +560,7 @@
             ---
             ## Running tests
 
-            ## ❓
+            ## ❌
 
             Note:
             - We might
@@ -465,7 +602,7 @@
             ---
             ## Running the server
 
-            ## ❓
+            ## ❌
 
             Note:
             - We probably do
@@ -482,6 +619,12 @@
             -- create_table(:users)
               -> 0.0011s
             == 20240921065947 CreateUsers: migrated (0.0011s) =======
+            ```
+            ```sh
+            > bin/rails assets:precompile
+            ```
+            ```sh
+            > bin/rails dbconsole
             ```
 
             Note:
@@ -515,7 +658,31 @@
             Note:
             - Today, Routes are always drawn at boot
             - Part of my team's work was to fix this in edge Rails
-            - In an upcoming release, routes will be drawn lazily in dev and test
+            - In Rails 8, routes are drawn lazily in dev and test
+            ---
+            ## Wait, no routes?
+
+            ```rb
+            # railties/lib/rails/engine/lazy_route_set.rb
+
+            module Rails
+              class Engine
+                class LazyRouteSet < ActionDispatch::Routing::RouteSet
+                  def call(req)
+                    Rails.application&.reload_routes_unless_loaded
+                    super
+                  end
+
+                  # ...
+                end
+              end
+            end
+            ```
+
+            Note:
+            - Basically the it works like this
+            - Every method of the route set is overridden
+            - It sounds simple, but this got reverted like 3 times
             ---
             ## Watching less files
 
@@ -523,6 +690,91 @@
 
             Note:
             - We also made optimizations to file watching
+            - This made apps not watch as many I18n files
+            - If you have gems with lots of translations, it makes a big difference
+            ---
+            ## Watching less files
+
+            ![I18n Watcher Optimization 2](images/i18n-watcher-2.png)
+
+            Note:
+            - More recently, we made another change
+            - This made it so we don't run the file watcher on boot
+            ---
+            ## Watching less files
+
+            ```rb
+            # activesupport/lib/i18n_railtie.rb
+
+            reloader = file_watcher.new(root_load_paths, directories) do
+              # delete old ones
+              I18n.load_path.delete_if do |path|
+                path.to_s.start_with?(Rails.root) && !File.exist?(path)
+              end
+
+              # add new ones
+              I18n.load_path |= reloadable_paths.flat_map(&:existent)
+            end
+            ```
+
+            Note:
+            - We delete files if they're in the rails root
+            - We don't execute the watcher immediately
+            - It was an expensive no-op
+            ---
+            ## Journey parsing
+
+            ![Journey Parser](images/journey-parser.png)
+
+            Note:
+            - This one was featured in the closing keynote
+            - We changed route parsing
+            - First, by removing the racc parser dependency and writing our own
+            ---
+            ## Journey parsing
+
+            ![Journey Parser 2](images/journey-parser-2.png)
+
+            Note:
+            - After that, we looked at the path scanner
+            - We reduced allocations during tokenization
+            ---
+            ## Journey parsing
+
+            ```rb
+            module ActionDispatch
+              module Journey
+                class Scanner
+                  def scan # eg. /some/path/:param(.:format)
+                    next_byte = @scanner.peek_byte
+                    if (token = STATIC_TOKENS[next_byte])
+                      @scanner.pos += 1
+                      @length = @scanner.skip(/\w+/).to_i + 1
+                      token
+                    else
+                      # ...
+                    end
+                  end
+                end
+              end
+            end
+            ```
+
+            Note:
+            - This is a simplified version of the scanner optimization
+            - Peeking bytes and using static tokens reduced allocations
+            - And made journey parsing ~10% faster for free
+            - The code is also more optimizable with YJIT
+            ---
+            ## AWS Autoloading
+
+            ![AWS Autoloading](images/aws-autoloading.png)
+
+            Note:
+            - We also made changes to the Amazon Web Services gem
+            - Client gems like this often are really complicated
+            - You might want to use S3, but you get clients for everything
+            - We were able to make constants load when they get referenced
             ---
             ## Restricting boot-time network IO
 
@@ -533,7 +785,7 @@
               class << self
                 attr_accessor :ready
 
-                def open(remote_host, remote_port, ...)
+                def open(...)
                   raise "Not ready yet" unless ready
                   super
                 end
@@ -545,7 +797,112 @@
             ```
 
             Note:
-            - And banned network requests on boot
+            - We also banned network requests on boot
+            - This code snippet allows you to do just that
+            ---
+            ## Restricting boot-time network IO
+
+            ```rb[3,15]
+            # lib/patches/net_http.rb
+
+            class RestrictedTCPSocket < TCPSocket
+              class << self
+                attr_accessor :ready
+
+                def open(...)
+                  raise "Not ready yet" unless ready
+                  super
+                end
+              end
+
+              self.ready = false
+            end
+            Net::HTTP::TCPSocket = RestrictedTCPSocket
+            ```
+
+            Note:
+            - This is done by subclassing Ruby's TCP socket
+            - And then assigning that class to the normal TCP socket
+            ---
+            ## Restricting boot-time network IO
+
+            ```rb[5-10]
+            # lib/patches/net_http.rb
+
+            class RestrictedTCPSocket < TCPSocket
+              class << self
+                attr_accessor :ready
+
+                def open(...)
+                  raise "Not ready yet" unless ready
+                  super
+                end
+              end
+
+              self.ready = false
+            end
+            Net::HTTP::TCPSocket = RestrictedTCPSocket
+            ```
+
+            Note:
+            - Inside of the subclass, we define a ready accessor
+            - Ready is set to false by default
+            - We override open and raise when we open a socket and aren't ready
+            ---
+            ## Restricting boot-time network IO
+
+            ```rb
+            # config/application.rb
+
+            module Some
+              class Application < Rails::Application
+                config.after_initialize do
+                  RestrictedTCPSocket.ready = true
+                end
+              end
+            end
+            ```
+
+            Note:
+            - We can then make an after_initialize hook that readies the socket
+            - This way, all network traffic will fail unless the app has been initialized
+            - Maybe this will be upstreamed one day, but not yet
+            ---
+            ## Server hooks
+
+            ```rb
+            # config/application.rb
+
+            module Some
+              class Application < Rails::Application
+                server do
+                  _ = Graphql::Schema
+                end
+              end
+            end
+            ```
+            Note:
+            - We also used a more exotic Rails feature
+            - Server hooks run code only when you launch the app server
+            - This becomes useful when you have multiple web workers
+            ---
+            ## Server hooks
+
+            ```rb[5-7]
+            # config/application.rb
+
+            module Some
+              class Application < Rails::Application
+                server do
+                  _ = Graphql::Schema
+                end
+              end
+            end
+            ```
+            Note:
+            - In this case, we're referencing a GraphQL schema
+            - This will load the code early, so we don't have to do it in each worker
+            - For heavier constants you know will be used
             ---
             ## The "leak" pipeline
 
@@ -675,6 +1032,34 @@
             Note:
             - Plug this script into CI and see what it finds
             ---
+            ## The "leak" pipeline
+
+            ```txt[1,10,12,14]
+            bin/leak_check:8:in `block in <main>': LoadError (LoadError)
+              ...
+              from gems/3.2.0/gems/activesupport-8.0.0.beta1/lib/active_support/lazy_load_hooks.rb:77:in `run_load_hooks'
+              from gems/3.2.0/gems/activerecord-8.0.0.beta1/lib/active_record/base.rb:337:in `<module:ActiveRecord>'
+              from gems/3.2.0/gems/activerecord-8.0.0.beta1/lib/active_record/base.rb:15:in `<main>'
+              from <internal:3.2.0/rubygems/core_ext/kernel_require.rb>:37:in `require'
+              from <internal:3.2.0/rubygems/core_ext/kernel_require.rb>:37:in `require'
+              from gems/3.2.0/gems/bootsnap-1.18.4/lib/bootsnap/load_path_cache/core_ext/kernel_require.rb:30:in `require'
+              from gems/3.2.0/gems/zeitwerk-2.7.0/lib/zeitwerk/core_ext/kernel.rb:34:in `require'
+              from ~/slow_app/app/models/application_record.rb:1:in `<main>'
+              ...
+              from ~/slow_app/app/models/user.rb:1:in `<main>'
+              ...
+              from ~/slow_app/config/initializers/user.rb:2
+              ...
+            ```
+            ```txt
+            bin/leak_check:17:in `<main>': LoadError
+            ```
+
+            Note:
+            - Errors will look like this
+            - Load hooks will tell you exactly what line you need to fix
+            - A defined? check won't, but it is often easy to find
+            ---
             ## Our progress
 
             ![Boot Graph](images/boot-graph.png)
@@ -689,9 +1074,16 @@
             ![Rails Boot Process Talk](images/rails-boot-process-talk.png)
 
             Note:
-            - Xavier is giving a talk tomorrow on boot
-            - He'll go into more depth
-            - Please check it out
+            - This is the part where I shouted out another talk
+            - Xavier from Rails Core talked about the Rails boot process
+            ---
+            ## Watch it here!
+
+            ![Talk QR Code](images/talk-qr-code.png)
+
+            Note:
+            - The talk is on YouTube
+            - You can watch it at this link
             ---
             ## Thanks!
 
@@ -700,6 +1092,17 @@
             Note:
             - Thanks for listening
             - Scan this QR code to view this presentation
+            ---
+            # Demo
+
+            Note:
+            - Network IO ban
+            - Show profiling code
+            - Show leak check code
+            - Action Pack leak
+            - Active Record leak
+            - Debuggers loading
+            - GCS / Heavy gem loading
             ---
           </textarea>
         </section>
